@@ -214,11 +214,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         })
         .then(async (response) => {
             if (!response.ok) {
+                // 先读取文本，然后尝试解析为 JSON
+                const text = await response.text();
                 try {
-                    const data = await response.json();
+                    const data = JSON.parse(text);
                     throw new Error(data.error || '注册失败');
-                } catch (_) {
-                    const text = await response.text();
+                } catch (e) {
+                    // 如果不是 JSON，直接使用文本内容
                     throw new Error(text || '注册失败');
                 }
             }
