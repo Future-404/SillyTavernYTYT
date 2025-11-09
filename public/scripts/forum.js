@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function initializeForum() {
     try {
-        // 检查用户登录状态
+        // 检查用户登录状态 - 带重试机制
         await checkUserStatus();
 
         // 加载文章
@@ -25,20 +25,40 @@ async function initializeForum() {
     }
 }
 
-async function checkUserStatus() {
+async function checkUserStatus(retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = 500; // 毫秒
+
     try {
         const response = await fetch('/api/users/me', {
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-cache'
         });
 
         if (response.ok) {
             const user = await response.json();
+            currentUser = user;
             updateUserInterface(user);
+            console.log('User logged in:', user.handle);
         } else {
+            // 如果是 401 且还有重试次数，则重试
+            if (response.status === 401 && retryCount < maxRetries) {
+                console.log(`User status check failed (attempt ${retryCount + 1}/${maxRetries + 1}), retrying...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                return await checkUserStatus(retryCount + 1);
+            }
+            currentUser = null;
             updateUserInterface(null);
         }
     } catch (error) {
         console.error('Error checking user status:', error);
+        // 如果是网络错误且还有重试次数，则重试
+        if (retryCount < maxRetries) {
+            console.log(`Network error (attempt ${retryCount + 1}/${maxRetries + 1}), retrying...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            return await checkUserStatus(retryCount + 1);
+        }
+        currentUser = null;
         updateUserInterface(null);
     }
 }
@@ -49,14 +69,16 @@ function updateUserInterface(user) {
     const userName = document.getElementById('userName');
 
     if (user) {
-        currentUser = user;
+        // currentUser 已经在 checkUserStatus 中设置，这里只更新 UI
         userInfo.style.display = 'flex';
         loginPrompt.style.display = 'none';
         userName.textContent = user.name || user.handle;
+        console.log('UI updated for logged-in user:', user.handle);
     } else {
-        currentUser = null;
+        // currentUser 已经在 checkUserStatus 中设置为 null，这里只更新 UI
         userInfo.style.display = 'none';
         loginPrompt.style.display = 'block';
+        console.log('UI updated for logged-out state');
     }
 }
 
@@ -470,12 +492,26 @@ function closeArticleDetailModal() {
 }
 
 async function submitComment() {
-    if (!currentUser || !currentArticle) {
-        alert('请先登录');
+    // 重新检查用户登录状态
+    if (!currentUser) {
+        console.warn('submitComment: currentUser is null, checking user status...');
+        await checkUserStatus();
+
+        // 再次检查
+        if (!currentUser) {
+            alert('请先登录后再发表评论');
+            window.location.href = '/login';
+            return;
+        }
+    }
+
+    if (!currentArticle) {
+        alert('文章信息获取失败，请刷新页面');
         return;
     }
 
-    const content = (/** @type {HTMLTextAreaElement} */ (document.getElementById('commentContent'))).value.trim();
+    const contentTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('commentContent'));
+    const content = contentTextarea.value.trim();
     if (!content) {
         alert('请输入评论内容');
         return;
@@ -501,6 +537,11 @@ async function submitComment() {
         });
 
         if (!response.ok) {
+            if (response.status === 401) {
+                alert('登录状态已过期，请重新登录');
+                window.location.href = '/login';
+                return;
+            }
             const error = await response.json();
             throw new Error(error.error || '评论失败');
         }
@@ -511,8 +552,11 @@ async function submitComment() {
         currentArticle.comments_count = (currentArticle.comments_count || 0) + 1;
 
         renderComments();
-        (/** @type {HTMLTextAreaElement} */ (document.getElementById('commentContent'))).value = '';
+        contentTextarea.value = '';
         document.getElementById('commentsCount').textContent = currentArticle.comments_count;
+
+        // 显示成功提示
+        console.log('Comment submitted successfully');
 
     } catch (error) {
         console.error('Error submitting comment:', error);
@@ -588,8 +632,21 @@ function hideReplyForm(commentId) {
 
 // 提交回复
 async function submitReply(parentCommentId) {
-    if (!currentUser || !currentArticle) {
-        alert('请先登录');
+    // 重新检查用户登录状态
+    if (!currentUser) {
+        console.warn('submitReply: currentUser is null, checking user status...');
+        await checkUserStatus();
+
+        // 再次检查
+        if (!currentUser) {
+            alert('请先登录后再回复');
+            window.location.href = '/login';
+            return;
+        }
+    }
+
+    if (!currentArticle) {
+        alert('文章信息获取失败，请刷新页面');
         return;
     }
 
@@ -625,6 +682,11 @@ async function submitReply(parentCommentId) {
         });
 
         if (!response.ok) {
+            if (response.status === 401) {
+                alert('登录状态已过期，请重新登录');
+                window.location.href = '/login';
+                return;
+            }
             const error = await response.json();
             throw new Error(error.error || '回复失败');
         }
@@ -638,10 +700,30 @@ async function submitReply(parentCommentId) {
         hideReplyForm(parentCommentId);
         document.getElementById('commentsCount').textContent = currentArticle.comments_count;
 
+        // 显示成功提示
+        console.log('Reply submitted successfully');
+
     } catch (error) {
         console.error('Error submitting reply:', error);
         alert(error.message || '回复失败，请稍后重试');
     }
+}
+
+/**
+ * 递归获取评论及其所有子评论的ID列表
+ * @param {string} commentId 评论ID
+ * @param {Array} comments 所有评论列表
+ * @returns {Array<string>} 评论ID列表
+ */
+function getCommentAndChildrenIds(commentId, comments) {
+    const ids = [commentId];
+    const children = comments.filter(c => c.parent_id === commentId);
+
+    for (const child of children) {
+        ids.push(...getCommentAndChildrenIds(child.id, comments));
+    }
+
+    return ids;
 }
 
 // 删除评论
@@ -651,7 +733,7 @@ async function deleteComment(commentId) {
         return;
     }
 
-    if (!confirm('确定要删除这条评论吗？此操作不可撤销。')) {
+    if (!confirm('确定要删除这条评论吗？此操作不可撤销。\n注意：删除评论会同时删除所有回复。')) {
         return;
     }
 
@@ -673,13 +755,24 @@ async function deleteComment(commentId) {
             throw new Error(error.error || '删除失败');
         }
 
-        // 从评论列表中移除删除的评论
-        currentArticle.comments = currentArticle.comments.filter(comment => comment.id !== commentId);
-        currentArticle.comments_count = Math.max(0, (currentArticle.comments_count || 0) - 1);
+        const result = await response.json();
+        const deletedCount = result.deletedCount || 1;
+
+        // 获取所有要删除的评论ID（包括子评论）
+        const idsToDelete = getCommentAndChildrenIds(commentId, currentArticle.comments);
+
+        // 从评论列表中移除所有被删除的评论
+        currentArticle.comments = currentArticle.comments.filter(comment => !idsToDelete.includes(comment.id));
+        currentArticle.comments_count = Math.max(0, (currentArticle.comments_count || 0) - deletedCount);
 
         renderComments();
         document.getElementById('commentsCount').textContent = currentArticle.comments_count;
-        alert('评论删除成功！');
+
+        if (deletedCount > 1) {
+            alert(`成功删除 ${deletedCount} 条评论（包括回复）！`);
+        } else {
+            alert('评论删除成功！');
+        }
 
     } catch (error) {
         console.error('Error deleting comment:', error);

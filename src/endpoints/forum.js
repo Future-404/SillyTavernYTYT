@@ -129,7 +129,7 @@ function saveComment(comment) {
 /**
  * 获取文章的所有评论
  * @param {string} articleId 文章ID
- * @returns {Array} 评论列表
+ * @returns {Array} 评论列表（平铺数组，前端会根据parent_id构建嵌套结构）
  */
 function getArticleComments(articleId) {
     try {
@@ -152,19 +152,9 @@ function getArticleComments(articleId) {
             }
         }
 
-        // 分离主评论和回复
-        const mainComments = allComments.filter(comment => !comment.parent_id);
-        const replies = allComments.filter(comment => comment.parent_id);
-
-        // 为每个主评论添加回复
-        mainComments.forEach(comment => {
-            comment.replies = replies
-                .filter(reply => reply.parent_id === comment.id)
-                .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-        });
-
-        // 按创建时间正序排列主评论
-        return mainComments.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        // 返回所有评论的平铺数组，按创建时间排序
+        // 前端会根据 parent_id 字段递归构建嵌套结构
+        return allComments.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     } catch (error) {
         console.error('Error getting article comments:', error);
         return [];
@@ -385,6 +375,41 @@ router.post('/articles/:articleId/comments', async function (request, response) 
     }
 });
 
+/**
+ * 递归删除评论及其所有子评论
+ * @param {string} commentId 评论ID
+ * @returns {number} 删除的评论数量
+ */
+function deleteCommentAndReplies(commentId) {
+    let deletedCount = 0;
+
+    try {
+        // 删除当前评论
+        const commentPath = path.join(COMMENTS_DIR, `${commentId}.json`);
+        if (fs.existsSync(commentPath)) {
+            const commentData = fs.readFileSync(commentPath, 'utf8');
+            const comment = JSON.parse(commentData);
+
+            // 先找到所有子评论
+            const allComments = getArticleComments(comment.article_id);
+            const childComments = allComments.filter(c => c.parent_id === commentId);
+
+            // 递归删除所有子评论
+            for (const child of childComments) {
+                deletedCount += deleteCommentAndReplies(child.id);
+            }
+
+            // 删除当前评论
+            fs.unlinkSync(commentPath);
+            deletedCount++;
+        }
+    } catch (error) {
+        console.error('Error deleting comment and replies:', error);
+    }
+
+    return deletedCount;
+}
+
 // 删除评论
 router.delete('/comments/:commentId', async function (request, response) {
     try {
@@ -411,18 +436,18 @@ router.delete('/comments/:commentId', async function (request, response) {
             return response.status(403).json({ error: 'Permission denied' });
         }
 
-        // 删除评论文件
-        fs.unlinkSync(commentPath);
+        // 递归删除评论及其所有子评论
+        const deletedCount = deleteCommentAndReplies(commentId);
 
         // 更新文章评论数
         const article = getArticle(comment.article_id);
         if (article) {
-            article.comments_count = Math.max(0, (article.comments_count || 0) - 1);
+            article.comments_count = Math.max(0, (article.comments_count || 0) - deletedCount);
             saveArticle(article);
         }
 
-        console.info(`Comment deleted by ${request.user.profile.handle}`);
-        response.json({ success: true });
+        console.info(`Comment and ${deletedCount - 1} replies deleted by ${request.user.profile.handle}`);
+        response.json({ success: true, deletedCount });
     } catch (error) {
         console.error('Error deleting comment:', error);
         response.status(500).json({ error: 'Failed to delete comment' });
