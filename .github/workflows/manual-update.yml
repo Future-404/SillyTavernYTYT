@@ -1,0 +1,66 @@
+# 给我们的工作流程起个名字
+name: Manual Build and Push Image
+
+# 这是“手动按钮”的开关！
+on:
+  workflow_dispatch:
+
+# 定义我们工作流程里的所有“工序”（Jobs）
+jobs:
+  # 第一个工序：同步上游代码
+  sync-upstream:
+    # 指定这道工序运行在最新的 Ubuntu 系统上
+    runs-on: ubuntu-latest
+    steps:
+      # 第一步：先把我们自己的仓库代码拉下来
+      - name: Checkout self repository
+        uses: actions/checkout@v4
+        with:
+          # 我们需要完整的 git 历史来进行同步
+          fetch-depth: 0
+
+      # 第二步：添加上游主仓库作为“遥控器”
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/SillyTavern/SillyTavern.git
+
+      # 第三步：从上游主仓库拉取最新代码
+      - name: Fetch from upstream
+        run: git fetch upstream
+
+      # 第四步：将上游主仓库的 main 分支合并到我们自己的 main 分支
+      - name: Merge upstream main to self main
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git checkout main
+          git merge --no-edit upstream/main
+
+      # 第五步：把合并后的最新代码，推送回我们自己的仓库
+      - name: Push changes to self repository
+        run: git push origin main
+
+  # 第二个工序：构建并推送 Docker 镜像
+  build-and-push:
+    # 这个工序，必须在第一个工序（sync-upstream）成功后才能开始
+    needs: sync-upstream
+    runs-on: ubuntu-latest
+    steps:
+      # 第一步：先把我们自己的（已经同步好的）仓库代码拉下来
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 第二步：登录到 GitHub 镜像仓库
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 第三步：构建并推送镜像
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/sillytavernytyt:latest
