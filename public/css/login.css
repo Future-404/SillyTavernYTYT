@@ -52,7 +52,11 @@ body.login .menu_button:hover {
 }
 
 /* 按钮间距更大一些 */
-body.login #passwordEntryBlock .flexGap10 { gap: 18px; }
+body.login #passwordEntryBlock .flexGap10 {
+    gap: 18px;
+    justify-content: center;
+    align-items: center;
+}
 
 /* 登录布局容器宽度优化 */
 body.login #userSelectBlock {
@@ -241,4 +245,50 @@ body.login #passwordRecoveryBlock {
 
 .login-announcement-area::-webkit-scrollbar-thumb:hover {
     background: rgba(155, 135, 245, 0.6);
+}
+
+/* 登录页面按钮响应式居中 */
+body.login #passwordEntryBlock .flexGap10,
+body.login #passwordRecoveryBlock .flexGap10 {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+/* 小屏幕优化 */
+@media (max-width: 768px) {
+    body.login #passwordEntryBlock .flexGap10,
+    body.login #passwordRecoveryBlock .flexGap10 {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    body.login .menu_button {
+        width: 100%;
+        max-width: 280px;
+        min-width: unset;
+    }
+
+    body.login #dialogue_popup {
+        padding: 24px 20px;
+    }
+
+    body.login #userSelectBlock {
+        padding: 0 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    body.login .menu_button {
+        max-width: 100%;
+        padding: 12px 20px;
+        font-size: 0.95rem;
+    }
+
+    body.login #passwordEntryBlock .flexGap10,
+    body.login #passwordRecoveryBlock .flexGap10 {
+        gap: 10px;
+    }
 }

@@ -293,6 +293,10 @@ app.get('/api/invitation-codes/status', (req, res) => {
     res.json({ enabled });
 });
 
+// Public email service status (no auth)
+const emailStatusModule = await import('./endpoints/email-status.js');
+app.use('/api/email', emailStatusModule.router);
+
 // Public login page announcements (no auth)
 app.get('/api/announcements/login/current', async (req, res) => {
     try {

@@ -299,3 +299,13 @@ enableInvitationCodes: false
 enablePublicCharacters: true
 # Enable forum/community page
 enableForum: true
+email:
+  enabled: false
+  smtp:
+    host: smtp.exmail.qq.com
+    port: 465
+    secure: true
+    user: your-email@example.com
+    password: password
+  from: your-email@example.com
+  fromName: SillyTavern

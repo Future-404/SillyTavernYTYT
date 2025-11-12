@@ -69,6 +69,7 @@
         "multer": "^2.0.2",
         "node-fetch": "^3.3.2",
         "node-persist": "^4.0.4",
+        "nodemailer": "^7.0.10",
         "open": "^10.2.0",
         "png-chunk-text": "^1.0.0",
         "png-chunks-extract": "^1.0.0",

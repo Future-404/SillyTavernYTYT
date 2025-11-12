@@ -953,6 +953,10 @@ async function openUserProfile() {
     template.find('.hasPassword').toggle(currentUser.password);
     template.find('.noPassword').toggle(!currentUser.password);
 
+    // 显示邮箱信息（如果没有绑定则显示为空）
+    const userEmail = currentUser.email || '';
+    template.find('.userEmail').text(userEmail);
+
     // 显示到期时间
     if (currentUser.expiresAt) {
         const expiresDate = new Date(currentUser.expiresAt);

@@ -64,7 +64,15 @@ async function sendRecoveryPart1(handle) {
         return displayError(errorData.error || 'An error occurred');
     }
 
+    const data = await response.json();
     showRecoveryBlock();
+
+    // 显示恢复码发送方式的提示信息
+    if (data.method === 'email') {
+        displayError(data.message || '密码恢复码已发送至您的邮箱，请查收', true);
+    } else {
+        displayError(data.message || '密码恢复码已显示在服务器控制台，请联系管理员获取', true);
+    }
 }
 
 /**

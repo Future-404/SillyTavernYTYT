@@ -15,6 +15,9 @@
         <button type="button" class="announcementsButton menu_button menu_button_icon" data-target-tab="announcementsBlock">
             <h4 data-i18n="Announcements">公告管理</h4>
         </button>
+        <button type="button" class="emailConfigButton menu_button menu_button_icon" data-target-tab="emailConfigBlock">
+            <h4 data-i18n="Email Config">邮件配置</h4>
+        </button>
     </nav>
 
     <div class="userAccountTemplate template_element">
@@ -487,6 +490,87 @@
                     <div class="announcementsContainer" id="loginAnnouncementsContainer">
                         <!-- 登录页面公告列表将在这里动态加载 -->
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邮件配置选项卡 -->
+    <div class="navTab emailConfigBlock" style="display: none;">
+        <div class="flex-container flexFlowColumn flexGap10">
+            <h3 data-i18n="Email Configuration">邮件服务配置</h3>
+
+            <div class="emailConfigForm">
+                <div class="flex-container flexNoGap alignItemsBaseline">
+                    <label class="checkbox_label" for="emailEnabled">
+                        <input type="checkbox" id="emailEnabled" />
+                        <span data-i18n="Enable Email Service">启用邮件服务</span>
+                    </label>
+                </div>
+
+                <div class="emailConfigFields" style="margin-top: 15px;">
+                    <div class="flex-container flexFlowColumn flexGap10">
+                        <div class="flex-container flexNoGap alignItemsCenter">
+                            <span data-i18n="SMTP Host:" style="min-width: 120px; display: inline-block;">SMTP 服务器:</span>
+                            <input id="emailSmtpHost" class="text_pole flex1" type="text" placeholder="例如: smtp.gmail.com">
+                        </div>
+
+                        <div class="flex-container flexNoGap alignItemsCenter">
+                            <span data-i18n="SMTP Port:" style="min-width: 120px; display: inline-block;">SMTP 端口:</span>
+                            <input id="emailSmtpPort" class="text_pole flex1" type="number" placeholder="587">
+                        </div>
+
+                        <div class="flex-container flexNoGap alignItemsBaseline">
+                            <label class="checkbox_label" for="emailSmtpSecure">
+                                <input type="checkbox" id="emailSmtpSecure" />
+                                <span data-i18n="Use SSL/TLS">使用 SSL/TLS (通常端口465需要启用)</span>
+                            </label>
+                        </div>
+
+                        <div class="flex-container flexNoGap alignItemsCenter">
+                            <span data-i18n="SMTP User:" style="min-width: 120px; display: inline-block;">SMTP 用户名:</span>
+                            <input id="emailSmtpUser" class="text_pole flex1" type="text" placeholder="your-email@example.com">
+                        </div>
+
+                        <div class="flex-container flexNoGap alignItemsCenter">
+                            <span data-i18n="SMTP Password:" style="min-width: 120px; display: inline-block;">SMTP 密码:</span>
+                            <input id="emailSmtpPassword" class="text_pole flex1" type="password" placeholder="密码或授权码" autocomplete="new-password">
+                        </div>
+
+                        <div class="flex-container flexNoGap alignItemsCenter">
+                            <span data-i18n="From Email:" style="min-width: 120px; display: inline-block;">发件人邮箱:</span>
+                            <input id="emailFrom" class="text_pole flex1" type="email" placeholder="noreply@example.com">
+                        </div>
+
+                        <div class="flex-container flexNoGap alignItemsCenter">
+                            <span data-i18n="From Name:" style="min-width: 120px; display: inline-block;">发件人名称:</span>
+                            <input id="emailFromName" class="text_pole flex1" type="text" placeholder="SillyTavern">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-container justifyCenter flexGap10" style="margin-top: 20px;">
+                    <button type="button" class="menu_button menu_button_icon" id="testEmailConfig">
+                        <i class="fa-fw fa-solid fa-paper-plane"></i>
+                        <span data-i18n="Test Email">发送测试邮件</span>
+                    </button>
+                    <button type="button" class="menu_button menu_button_icon" id="saveEmailConfig">
+                        <i class="fa-fw fa-solid fa-save"></i>
+                        <span data-i18n="Save">保存配置</span>
+                    </button>
+                </div>
+
+                <div class="emailConfigTips" style="margin-top: 20px; padding: 15px; background: var(--SmartThemeBlurTintColor); border-radius: 5px;">
+                    <h4>配置说明：</h4>
+                    <ul style="padding-left: 20px;">
+                        <li><strong>Gmail:</strong> 使用 smtp.gmail.com:587，需要在 Google 账号中开启"应用专用密码"</li>
+                        <li><strong>QQ邮箱:</strong> 使用 smtp.qq.com:587 或 465（启用SSL），需要获取授权码</li>
+                        <li><strong>腾讯企业邮箱:</strong> 使用 smtp.exmail.qq.com:465（必须启用SSL），使用邮箱密码</li>
+                        <li><strong>163邮箱:</strong> 使用 smtp.163.com:465（启用SSL）或 smtp.163.com:25，需要获取授权码</li>
+                        <li><strong>Outlook:</strong> 使用 smtp-mail.outlook.com:587</li>
+                        <li><strong>⚠️ 端口465必须勾选"使用 SSL/TLS"选项</strong></li>
+                        <li>配置将保存在 config.yaml 文件中，修改后需要重启服务才能生效</li>
+                    </ul>
                 </div>
             </div>
         </div>

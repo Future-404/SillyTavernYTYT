@@ -56,6 +56,7 @@ const STORAGE_KEYS = {
  * @property {boolean} enabled - Whether the user is enabled
  * @property {boolean} admin - Whether the user is an admin (can manage other users)
  * @property {number | null} [expiresAt] - The timestamp when the user subscription expires (null for permanent users)
+ * @property {string} [email] - The user's email address (optional)
  */
 
 /**
@@ -69,6 +70,7 @@ const STORAGE_KEYS = {
  * @property {number} [created] - The timestamp when the user was created
  * @property {number} [storageSize] - The total size of the user's data in bytes
  * @property {number | null} [expiresAt] - The timestamp when the user subscription expires (null for permanent users)
+ * @property {string} [email] - The user's email address (optional)
  */
 
 /**

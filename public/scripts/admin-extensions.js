@@ -91,6 +91,14 @@ function bindTabEvents() {
             showAnnouncementsTab();
         });
     }
+
+    // 邮件配置选项卡
+    const emailConfigButton = document.querySelector('.emailConfigButton');
+    if (emailConfigButton) {
+        emailConfigButton.addEventListener('click', function() {
+            showEmailConfigTab();
+        });
+    }
 }
 
 // 显示系统负载选项卡
@@ -133,6 +141,19 @@ function showAnnouncementsTab() {
         announcementsBlock.style.display = 'block';
         bindAnnouncementEvents(); // 重新绑定事件
         loadAnnouncements();
+    }
+}
+
+// 显示邮件配置选项卡
+function showEmailConfigTab() {
+    // 隐藏其他选项卡
+    hideAllTabs();
+
+    // 显示邮件配置选项卡
+    const emailConfigBlock = document.querySelector('.emailConfigBlock');
+    if (emailConfigBlock) {
+        emailConfigBlock.style.display = 'block';
+        loadEmailConfig(); // 加载邮件配置
     }
 }
 
@@ -1890,6 +1911,168 @@ async function deleteLoginAnnouncement(announcementId) {
 // 将函数添加到全局作用域，以便HTML的onclick可以调用
 window.toggleLoginAnnouncement = toggleLoginAnnouncement;
 window.deleteLoginAnnouncement = deleteLoginAnnouncement;
+
+// ============================================================
+// 邮件配置管理
+// ============================================================
+
+// 加载邮件配置
+async function loadEmailConfig() {
+    try {
+        const response = await fetch('/api/email-config/get', {
+            method: 'GET',
+            headers: getRequestHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load email config');
+        }
+
+        const config = await response.json();
+
+        // 填充表单
+        $('#emailEnabled').prop('checked', config.enabled || false);
+        $('#emailSmtpHost').val(config.host || '');
+        $('#emailSmtpPort').val(config.port || 587);
+        $('#emailSmtpSecure').prop('checked', config.secure || false);
+        $('#emailSmtpUser').val(config.user || '');
+        $('#emailSmtpPassword').val(config.password || '');
+        $('#emailFrom').val(config.from || '');
+        $('#emailFromName').val(config.fromName || 'SillyTavern');
+
+    } catch (error) {
+        console.error('Error loading email config:', error);
+        alert('加载邮件配置失败: ' + error.message);
+    }
+}
+
+// 保存邮件配置
+async function saveEmailConfig() {
+    const saveButton = $('#saveEmailConfig');
+    const originalText = saveButton.html();
+
+    try {
+        saveButton.prop('disabled', true);
+        saveButton.html('<i class="fa-fw fa-solid fa-spinner fa-spin"></i> 保存中...');
+
+        const config = {
+            enabled: $('#emailEnabled').prop('checked'),
+            host: $('#emailSmtpHost').val().trim(),
+            port: parseInt($('#emailSmtpPort').val()) || 587,
+            secure: $('#emailSmtpSecure').prop('checked'),
+            user: $('#emailSmtpUser').val().trim(),
+            password: $('#emailSmtpPassword').val() || '',  // 确保密码字段不为 undefined
+            from: $('#emailFrom').val().trim(),
+            fromName: $('#emailFromName').val().trim() || 'SillyTavern'
+        };
+
+        // 验证必填字段
+        if (config.enabled) {
+            if (!config.host || !config.user || !config.password || !config.from) {
+                alert('请填写所有必填字段（SMTP服务器、用户名、密码、发件人邮箱）');
+                return;
+            }
+
+            // 验证邮箱格式
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(config.from)) {
+                alert('发件人邮箱格式不正确');
+                return;
+            }
+        }
+
+        const response = await fetch('/api/email-config/save', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to save email config');
+        }
+
+        const result = await response.json();
+        console.log('Email config saved:', result);
+
+        alert('邮件配置保存成功！部分更改可能需要重启服务器才能生效。');
+
+    } catch (error) {
+        console.error('Error saving email config:', error);
+        alert('保存邮件配置失败: ' + error.message);
+    } finally {
+        saveButton.prop('disabled', false);
+        saveButton.html(originalText);
+    }
+}
+
+// 测试邮件配置
+async function testEmailConfig() {
+    const testButton = $('#testEmailConfig');
+    const originalText = testButton.html();
+
+    try {
+        // 先保存当前配置
+        await saveEmailConfig();
+
+        const testEmail = prompt('请输入测试邮箱地址：', '');
+
+        if (!testEmail) {
+            return;
+        }
+
+        // 验证邮箱格式
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(testEmail)) {
+            alert('邮箱格式不正确');
+            return;
+        }
+
+        testButton.prop('disabled', true);
+        testButton.html('<i class="fa-fw fa-solid fa-spinner fa-spin"></i> 发送中...');
+
+        const response = await fetch('/api/email-config/test', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({ testEmail })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to test email config');
+        }
+
+        const result = await response.json();
+        console.log('Email test result:', result);
+
+        alert('测试邮件已发送，请检查您的邮箱！');
+
+    } catch (error) {
+        console.error('Error testing email config:', error);
+        alert('测试邮件发送失败: ' + error.message);
+    } finally {
+        testButton.prop('disabled', false);
+        testButton.html(originalText);
+    }
+}
+
+// 初始化邮件配置事件
+function initializeEmailConfig() {
+    // 绑定保存按钮
+    $('#saveEmailConfig').off('click').on('click', saveEmailConfig);
+
+    // 绑定测试按钮
+    $('#testEmailConfig').off('click').on('click', testEmailConfig);
+}
+
+// 将邮件配置初始化添加到主初始化函数中
+const originalInitialize = window.initializeAdminExtensions;
+window.initializeAdminExtensions = function() {
+    if (typeof originalInitialize === 'function') {
+        originalInitialize();
+    }
+    initializeEmailConfig();
+};
 
 // 导出函数供外部调用
 if (typeof window !== 'undefined') {

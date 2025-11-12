@@ -10,10 +10,12 @@ import { validateInvitationCode, useInvitationCode, getPurchaseLink, isInvitatio
 import { checkForNewContent, CONTENT_TYPES } from './content-manager.js';
 import systemMonitor from '../system-monitor.js';
 import lodash from 'lodash';
+import { isEmailServiceAvailable, sendVerificationCode, sendPasswordRecoveryCode } from '../email-service.js';
 
 const DISCREET_LOGIN = getConfigValue('enableDiscreetLogin', false, 'boolean');
 const PREFER_REAL_IP_HEADER = getConfigValue('rateLimiting.preferRealIpHeader', false, 'boolean');
 const MFA_CACHE = new Cache(5 * 60 * 1000);
+const VERIFICATION_CODE_CACHE = new Cache(5 * 60 * 1000); // 验证码缓存，5分钟有效
 
 const getIpAddress = (request) => PREFER_REAL_IP_HEADER ? getRealIpFromHeader(request) : getIpFromRequest(request);
 
@@ -27,6 +29,10 @@ const recoverLimiter = new RateLimiterMemory({
     duration: 300,
 });
 const registerLimiter = new RateLimiterMemory({
+    points: 3,
+    duration: 300,
+});
+const sendVerificationLimiter = new RateLimiterMemory({
     points: 3,
     duration: 300,
 });
@@ -203,6 +209,53 @@ router.post('/heartbeat', async (request, response) => {
     }
 });
 
+router.post('/send-verification', async (request, response) => {
+    try {
+        if (!request.body.email || !request.body.userName) {
+            console.warn('Send verification failed: Missing required fields');
+            return response.status(400).json({ error: '缺少必填字段' });
+        }
+
+        const ip = getIpAddress(request);
+        await sendVerificationLimiter.consume(ip);
+
+        // 检查邮件服务是否可用
+        if (!isEmailServiceAvailable()) {
+            console.error('Send verification failed: Email service not available');
+            return response.status(503).json({ error: '邮件服务未启用，请联系管理员' });
+        }
+
+        const email = request.body.email.toLowerCase().trim();
+        const userName = request.body.userName.trim();
+
+        // 生成6位数字验证码
+        const verificationCode = String(crypto.randomInt(100000, 999999));
+
+        // 将验证码存入缓存，key为邮箱地址
+        VERIFICATION_CODE_CACHE.set(email, verificationCode);
+
+        // 发送验证码邮件
+        const sent = await sendVerificationCode(email, verificationCode, userName);
+
+        if (!sent) {
+            console.error('Send verification failed: Failed to send email to', email);
+            return response.status(500).json({ error: '发送邮件失败，请稍后重试' });
+        }
+
+        console.info('Verification code sent to', email);
+        await sendVerificationLimiter.delete(ip);
+        return response.json({ success: true });
+    } catch (error) {
+        if (error instanceof RateLimiterRes) {
+            console.error('Send verification failed: Rate limited from', getIpAddress(request));
+            return response.status(429).send({ error: '发送次数过多，请稍后重试' });
+        }
+
+        console.error('Send verification failed:', error);
+        return response.sendStatus(500);
+    }
+});
+
 router.post('/recover-step1', async (request, response) => {
     try {
         if (!request.body.handle) {
@@ -226,12 +279,42 @@ router.post('/recover-step1', async (request, response) => {
             return response.status(403).json({ error: '用户已被禁用' });
         }
 
+        // 检查用户是否绑定了邮箱
+        if (!user.email) {
+            console.error('Recover step 1 failed: User', user.handle, 'has no email');
+            return response.status(400).json({ error: '该账户未绑定邮箱，无法通过邮箱找回密码。请联系管理员。' });
+        }
+
         const mfaCode = String(crypto.randomInt(1000, 9999));
+
+        // 尝试通过邮件发送恢复码
+        if (isEmailServiceAvailable()) {
+            const sent = await sendPasswordRecoveryCode(user.email, mfaCode, user.name);
+            if (sent) {
+                console.info('Password recovery code sent to email:', user.email);
+                MFA_CACHE.set(user.handle, mfaCode);
+                await recoverLimiter.delete(ip);
+                return response.json({
+                    success: true,
+                    method: 'email',
+                    message: '密码恢复码已发送至您的邮箱'
+                });
+            } else {
+                console.error('Failed to send recovery code to email, falling back to console');
+            }
+        }
+
+        // 如果邮件服务不可用或发送失败，回退到控制台输出
         console.log();
         console.log(color.blue(`${user.name}, your password recovery code is: `) + color.magenta(mfaCode));
         console.log();
         MFA_CACHE.set(user.handle, mfaCode);
-        return response.sendStatus(204);
+        await recoverLimiter.delete(ip);
+        return response.json({
+            success: true,
+            method: 'console',
+            message: '密码恢复码已显示在服务器控制台，请联系管理员获取'
+        });
     } catch (error) {
         if (error instanceof RateLimiterRes) {
             console.error('Recover step 1 failed: Rate limited from', getIpAddress(request));
@@ -299,11 +382,45 @@ router.post('/recover-step2', async (request, response) => {
 
 router.post('/register', async (request, response) => {
     try {
-        const { handle, name, password, confirmPassword, invitationCode } = request.body;
+        const { handle, name, password, confirmPassword, email, verificationCode, invitationCode } = request.body;
 
         if (!handle || !name || !password || !confirmPassword) {
             console.warn('Register failed: Missing required fields');
             return response.status(400).json({ error: '请填写所有必填字段' });
+        }
+
+        let normalizedEmail = null;
+
+        // 只有邮件服务启用时才验证邮箱和验证码
+        if (isEmailServiceAvailable()) {
+            if (!email || !verificationCode) {
+                console.warn('Register failed: Missing email or verification code');
+                return response.status(400).json({ error: '请填写邮箱和验证码' });
+            }
+
+            // 验证邮箱格式
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                console.warn('Register failed: Invalid email format');
+                return response.status(400).json({ error: '邮箱格式不正确' });
+            }
+
+            // 验证验证码
+            normalizedEmail = email.toLowerCase().trim();
+            const cachedCode = VERIFICATION_CODE_CACHE.get(normalizedEmail);
+
+            if (!cachedCode) {
+                console.warn('Register failed: Verification code expired or not found');
+                return response.status(400).json({ error: '验证码已过期或不存在，请重新发送' });
+            }
+
+            if (cachedCode !== verificationCode) {
+                console.warn('Register failed: Incorrect verification code');
+                return response.status(400).json({ error: '验证码错误' });
+            }
+        } else if (email) {
+            // 即使邮件服务未启用，如果用户提供了邮箱，也保存它
+            normalizedEmail = email.toLowerCase().trim();
         }
 
         if (password !== confirmPassword) {
@@ -381,7 +498,17 @@ router.post('/register', async (request, response) => {
             expiresAt: userExpiresAt,
         };
 
+        // 只有在有邮箱时才保存
+        if (normalizedEmail) {
+            newUser.email = normalizedEmail;
+        }
+
         await storage.setItem(toKey(normalizedHandle), newUser);
+
+        // 清除已使用的验证码（如果使用了邮件验证）
+        if (normalizedEmail && isEmailServiceAvailable()) {
+            VERIFICATION_CODE_CACHE.remove(normalizedEmail);
+        }
 
         // 使用邀请码（如果邀请码功能启用且提供了邀请码）
         if (isInvitationCodesEnabled() && invitationCode) {
@@ -434,7 +561,8 @@ router.get('/me', async (request, response) => {
             created: user.created,
             avatar: avatar,
             password: !!user.password,
-            expiresAt: user.expiresAt || null
+            expiresAt: user.expiresAt || null,
+            email: user.email || null
         });
     } catch (error) {
         console.error('Get current user failed:', error);

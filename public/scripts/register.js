@@ -17,21 +17,56 @@ document.addEventListener('DOMContentLoaded', async function() {
     const errorMessage = /** @type {HTMLElement} */ (document.getElementById('errorMessage'));
     const registerButton = /** @type {HTMLButtonElement} */ (document.getElementById('registerButton'));
     const backToLoginButton = /** @type {HTMLButtonElement} */ (document.getElementById('backToLoginButton'));
+    const invitationSection = /** @type {HTMLElement} */ (document.getElementById('invitationSection'));
     const invitationCodeGroup = /** @type {HTMLElement} */ (document.getElementById('invitationCodeGroup'));
 
     const userHandleInput = /** @type {HTMLInputElement} */ (document.getElementById('userHandle'));
     const displayNameInput = /** @type {HTMLInputElement} */ (document.getElementById('displayName'));
     const userPasswordInput = /** @type {HTMLInputElement} */ (document.getElementById('userPassword'));
     const confirmPasswordInput = /** @type {HTMLInputElement} */ (document.getElementById('confirmPassword'));
+    const userEmailInput = /** @type {HTMLInputElement} */ (document.getElementById('userEmail'));
+    const verificationCodeInput = /** @type {HTMLInputElement} */ (document.getElementById('verificationCode'));
+    const sendVerificationButton = /** @type {HTMLButtonElement} */ (document.getElementById('sendVerificationButton'));
     const invitationCodeInput = /** @type {HTMLInputElement} */ (document.getElementById('invitationCode'));
 
-    // 先获取CSRF Token，再检查是否需要邀请码
+    let verificationCodeSent = false;
+    let verificationCooldown = 0;
+    let emailServiceEnabled = false;
+
+    // 先获取CSRF Token，再检查是否需要邀请码和邮件服务状态
     await getCsrfToken();
+    await checkEmailServiceStatus();
     await checkInvitationCodeStatus();
 
     // 返回登录按钮事件
     backToLoginButton.addEventListener('click', function() {
         window.location.href = '/login';
+    });
+
+    // 发送验证码按钮事件
+    sendVerificationButton.addEventListener('click', async function() {
+        const email = userEmailInput.value.trim();
+        const userName = displayNameInput.value.trim() || userHandleInput.value.trim();
+
+        if (!email) {
+            showError('请输入邮箱地址');
+            return;
+        }
+
+        if (!userName) {
+            showError('请先填写显示名称或用户名');
+            return;
+        }
+
+        // 验证邮箱格式
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            showError('邮箱格式不正确');
+            return;
+        }
+
+        // 发送验证码
+        await sendVerificationCodeToEmail(email, userName);
     });
 
     // 表单提交事件
@@ -43,6 +78,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             name: displayNameInput.value.trim(),
             password: userPasswordInput.value,
             confirmPassword: confirmPasswordInput.value,
+            email: userEmailInput.value.trim(),
+            verificationCode: verificationCodeInput.value.trim(),
             invitationCode: invitationCodeInput.value.trim()
         };
 
@@ -60,6 +97,42 @@ document.addEventListener('DOMContentLoaded', async function() {
     userPasswordInput.addEventListener('input', validatePassword);
     confirmPasswordInput.addEventListener('input', validateConfirmPassword);
 
+    async function checkEmailServiceStatus() {
+        try {
+            const response = await fetch('/api/email/status', {
+                method: 'GET',
+                credentials: 'same-origin',
+            });
+            if (!response.ok) {
+                emailServiceEnabled = false;
+                return;
+            }
+            const data = await response.json();
+            emailServiceEnabled = data.enabled || false;
+
+            // 如果邮件服务未启用，隐藏整个邮箱验证区域
+            const emailSection = document.getElementById('emailSection');
+
+            if (!emailServiceEnabled) {
+                if (emailSection) emailSection.style.display = 'none';
+                userEmailInput.required = false;
+                verificationCodeInput.required = false;
+            } else {
+                if (emailSection) emailSection.style.display = 'block';
+                userEmailInput.required = true;
+                verificationCodeInput.required = true;
+            }
+        } catch (error) {
+            console.error('Error checking email service status:', error);
+            emailServiceEnabled = false;
+            // 出错时隐藏整个邮箱验证区域
+            const emailSection = document.getElementById('emailSection');
+            if (emailSection) emailSection.style.display = 'none';
+            userEmailInput.required = false;
+            verificationCodeInput.required = false;
+        }
+    }
+
     async function checkInvitationCodeStatus() {
         try {
             const response = await fetch('/api/invitation-codes/status', {
@@ -73,7 +146,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             const data = await response.json();
             if (data && data.enabled) {
-                invitationCodeGroup.style.display = 'block';
+                if (invitationSection) invitationSection.style.display = 'block';
                 invitationCodeInput.required = true;
             }
         } catch (error) {
@@ -85,10 +158,31 @@ document.addEventListener('DOMContentLoaded', async function() {
         // 清除之前的错误消息
         hideError();
 
-        // 检查必填字段
+        // 检查基本必填字段
         if (!formData.handle || !formData.name || !formData.password || !formData.confirmPassword) {
             showError('请填写所有必填字段');
             return false;
+        }
+
+        // 如果邮件服务启用，验证邮箱和验证码
+        if (emailServiceEnabled) {
+            if (!formData.email || !formData.verificationCode) {
+                showError('请填写邮箱和验证码');
+                return false;
+            }
+
+            // 验证邮箱格式
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(formData.email)) {
+                showError('邮箱格式不正确');
+                return false;
+            }
+
+            // 验证验证码格式
+            if (!/^\d{6}$/.test(formData.verificationCode)) {
+                showError('验证码格式不正确，应为6位数字');
+                return false;
+            }
         }
 
         // 规范化用户名：转小写，去除所有非字母数字字符
@@ -124,7 +218,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // 如果需要邀请码，检查是否填写
-        if (invitationCodeGroup.style.display !== 'none' && !formData.invitationCode) {
+        const needsInvitation = invitationSection && invitationSection.style.display !== 'none';
+        if (needsInvitation && !formData.invitationCode) {
             showError('请输入邀请码');
             return false;
         }
@@ -291,5 +386,61 @@ document.addEventListener('DOMContentLoaded', async function() {
             registerButton.disabled = false;
             registerButton.textContent = '创建账户';
         }
+    }
+
+    async function sendVerificationCodeToEmail(email, userName) {
+        if (verificationCooldown > 0) {
+            showError(`请等待 ${verificationCooldown} 秒后再次发送`);
+            return;
+        }
+
+        // 禁用按钮并显示加载状态
+        sendVerificationButton.disabled = true;
+        sendVerificationButton.textContent = '发送中...';
+
+        try {
+            const response = await fetch('/api/users/send-verification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(regCsrfToken ? { 'x-csrf-token': regCsrfToken } : {}),
+                },
+                body: JSON.stringify({ email, userName })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || '发送验证码失败');
+            }
+
+            verificationCodeSent = true;
+            showSuccess('验证码已发送至您的邮箱，请查收');
+
+            // 启动60秒冷却
+            verificationCooldown = 60;
+            updateCooldownButton();
+
+            const interval = setInterval(() => {
+                verificationCooldown--;
+                if (verificationCooldown <= 0) {
+                    clearInterval(interval);
+                    sendVerificationButton.disabled = false;
+                    sendVerificationButton.textContent = '重新发送';
+                } else {
+                    updateCooldownButton();
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('Send verification code error:', error);
+            showError(error.message || '发送验证码失败，请稍后重试');
+            sendVerificationButton.disabled = false;
+            sendVerificationButton.textContent = '发送验证码';
+        }
+    }
+
+    function updateCooldownButton() {
+        sendVerificationButton.textContent = `${verificationCooldown}秒后重试`;
     }
 });

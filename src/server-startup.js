@@ -53,6 +53,8 @@ import { router as systemLoadRouter } from './endpoints/system-load.js';
 import { router as publicCharactersRouter } from './endpoints/public-characters.js';
 import { router as announcementsRouter } from './endpoints/announcements.js';
 import { router as publicConfigRouter } from './endpoints/public-config.js';
+import { router as emailConfigRouter } from './endpoints/email-config.js';
+import { router as emailStatusRouter } from './endpoints/email-status.js';
 import { getConfigValue } from './util.js';
 
 /**
@@ -189,6 +191,7 @@ export function setupPrivateEndpoints(app) {
         }
 
         app.use('/api/invitation-codes', invitationCodesRouter);
+        app.use('/api/email-config', emailConfigRouter);
         app.use('/api/system-load', systemLoadRouter);
 
         // 根据配置控制角色卡分享API路由

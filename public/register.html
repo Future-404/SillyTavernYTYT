@@ -62,48 +62,158 @@
             <div id="dialogue_popup_holder">
                 <div id="dialogue_popup_text">
                     <div id="registerBlock" class="register-container">
-                        <div class="register-form-container">
+                        <div class="register-card">
+                            <!-- Logo和标题 -->
                             <div class="register-header">
+                                <div class="register-logo">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#gradient1)"/>
+                                        <path d="M2 17L12 22L22 17V12L12 17L2 12V17Z" fill="url(#gradient2)"/>
+                                        <defs>
+                                            <linearGradient id="gradient1" x1="2" y1="2" x2="22" y2="12">
+                                                <stop offset="0%" stop-color="#667eea"/>
+                                                <stop offset="100%" stop-color="#764ba2"/>
+                                            </linearGradient>
+                                            <linearGradient id="gradient2" x1="2" y1="12" x2="22" y2="22">
+                                                <stop offset="0%" stop-color="#f093fb"/>
+                                                <stop offset="100%" stop-color="#f5576c"/>
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                </div>
                                 <h1 class="register-title">欢迎来到 SillyTavern</h1>
                                 <p class="register-subtitle">创建您的账户，开始AI对话之旅</p>
                             </div>
+
                             <form id="registerForm" class="register-form">
-                                <div class="form-group">
-                                    <label for="displayName" class="form-label">显示名称</label>
-                                    <input id="displayName" class="form-input" type="text" placeholder="请输入您的显示名称" autocomplete="name" required>
+                                <!-- 基本信息 -->
+                                <div class="form-section">
+                                    <div class="form-section-title">
+                                        <i class="fa-solid fa-user"></i>
+                                        <span>基本信息</span>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="displayName" class="form-label">
+                                                <i class="fa-solid fa-id-card"></i>
+                                                显示名称
+                                            </label>
+                                            <input id="displayName" class="form-input" type="text" placeholder="请输入您的显示名称" autocomplete="name" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="userHandle" class="form-label">
+                                                <i class="fa-solid fa-at"></i>
+                                                用户名
+                                            </label>
+                                            <input id="userHandle" class="form-input" type="text" placeholder="仅限字母和数字，不允许符号" pattern="[a-z0-9]+" autocomplete="username" required>
+                                            <small class="form-hint">例如：johndoe123（只能包含字母和数字）</small>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="form-group">
-                                    <label for="userHandle" class="form-label">用户名</label>
-                                    <input id="userHandle" class="form-input" type="text" placeholder="仅限字母和数字，不允许符号" pattern="[a-z0-9]+" autocomplete="username" required>
-                                    <small class="form-hint">例如：johndoe123（只能包含字母和数字）</small>
+                                <!-- 安全设置 -->
+                                <div class="form-section">
+                                    <div class="form-section-title">
+                                        <i class="fa-solid fa-lock"></i>
+                                        <span>安全设置</span>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="userPassword" class="form-label">
+                                                <i class="fa-solid fa-key"></i>
+                                                密码
+                                            </label>
+                                            <input id="userPassword" class="form-input" type="password" placeholder="请输入密码" autocomplete="new-password" required>
+                                            <small class="form-hint">密码长度至少6位</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="confirmPassword" class="form-label">
+                                                <i class="fa-solid fa-shield-halved"></i>
+                                                确认密码
+                                            </label>
+                                            <input id="confirmPassword" class="form-input" type="password" placeholder="请再次输入密码" autocomplete="new-password" required>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="form-group">
-                                    <label for="userPassword" class="form-label">密码</label>
-                                    <input id="userPassword" class="form-input" type="password" placeholder="请输入密码" autocomplete="new-password" required>
-                                    <small class="form-hint">密码长度至少6位</small>
+                                <!-- 邮箱验证 -->
+                                <div class="form-section" id="emailSection">
+                                    <div class="form-section-title">
+                                        <i class="fa-solid fa-envelope"></i>
+                                        <span>邮箱验证</span>
+                                    </div>
+
+                                    <div class="form-row" id="emailGroup">
+                                        <div class="form-group">
+                                            <label for="userEmail" class="form-label">
+                                                <i class="fa-solid fa-at"></i>
+                                                电子邮箱
+                                            </label>
+                                            <div class="input-with-button">
+                                                <input id="userEmail" class="form-input" type="email" placeholder="请输入您的邮箱" autocomplete="email" required>
+                                                <button type="button" id="sendVerificationButton" class="btn-send-code">
+                                                    <i class="fa-solid fa-paper-plane"></i>
+                                                    <span>发送验证码</span>
+                                                </button>
+                                            </div>
+                                            <small class="form-hint">注册需要验证邮箱</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row" id="verificationCodeGroup">
+                                        <div class="form-group">
+                                            <label for="verificationCode" class="form-label">
+                                                <i class="fa-solid fa-hashtag"></i>
+                                                邮箱验证码
+                                            </label>
+                                            <input id="verificationCode" class="form-input code-input" type="text" placeholder="请输入6位验证码" autocomplete="off" required maxlength="6">
+                                            <small class="form-hint">验证码已发送至您的邮箱，5分钟内有效</small>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="form-group">
-                                    <label for="confirmPassword" class="form-label">确认密码</label>
-                                    <input id="confirmPassword" class="form-input" type="password" placeholder="请再次输入密码" autocomplete="new-password" required>
+                                <!-- 邀请码（如果需要） -->
+                                <div class="form-section" id="invitationSection" style="display: none;">
+                                    <div class="form-section-title">
+                                        <i class="fa-solid fa-ticket"></i>
+                                        <span>邀请码</span>
+                                    </div>
+
+                                    <div class="form-row" id="invitationCodeGroup">
+                                        <div class="form-group">
+                                            <label for="invitationCode" class="form-label">
+                                                <i class="fa-solid fa-gift"></i>
+                                                邀请码
+                                            </label>
+                                            <input id="invitationCode" class="form-input" type="text" placeholder="请输入邀请码" autocomplete="off">
+                                            <small class="form-hint">注册需要有效的邀请码</small>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="form-group" id="invitationCodeGroup" style="display: none;">
-                                    <label for="invitationCode" class="form-label">邀请码</label>
-                                    <input id="invitationCode" class="form-input" type="text" placeholder="请输入邀请码" autocomplete="off">
-                                    <small class="form-hint">注册需要有效的邀请码</small>
-                                </div>
-
+                                <!-- 操作按钮 -->
                                 <div class="form-actions">
-                                    <button type="submit" id="registerButton" class="btn btn-primary">创建账户</button>
-                                    <button type="button" id="backToLoginButton" class="btn btn-secondary">返回登录</button>
+                                    <button type="submit" id="registerButton" class="btn btn-primary">
+                                        <i class="fa-solid fa-user-plus"></i>
+                                        <span>创建账户</span>
+                                    </button>
+                                    <button type="button" id="backToLoginButton" class="btn btn-secondary">
+                                        <i class="fa-solid fa-arrow-left"></i>
+                                        <span>返回登录</span>
+                                    </button>
                                 </div>
                             </form>
-                        </div>
 
-                        <div id="errorMessage" class="error-message"></div>
+                            <div id="errorMessage" class="message-box"></div>
+                        </div>
                     </div>
                 </div>
             </div>
