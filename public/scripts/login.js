@@ -346,6 +346,9 @@ function configureDiscreetLogin() {
         showRenewalBlock(expiredPurchaseLink);
     }
 
+    // 加载并显示登录页面公告
+    await loadLoginAnnouncements();
+
     $(document).on('keydown', (evt) => {
         if (evt.key === 'Enter' && document.activeElement.tagName === 'INPUT') {
             // 阻止默认行为，防止表单重复提交
@@ -477,4 +480,93 @@ function displayError(message, isSuccess = false) {
             'color': ''
         });
     }
+}
+
+/**
+ * 获取并显示登录页面公告
+ */
+async function loadLoginAnnouncements() {
+    try {
+        const response = await fetch('/api/announcements/login/current', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            console.error('Failed to load login announcements');
+            return;
+        }
+
+        const announcements = await response.json();
+        console.log('Login announcements loaded:', announcements);
+
+        if (announcements && announcements.length > 0) {
+            showLoginAnnouncements(announcements);
+        }
+    } catch (error) {
+        console.error('Error loading login announcements:', error);
+    }
+}
+
+/**
+ * 显示登录页面公告
+ * @param {Array} announcements 公告列表
+ */
+function showLoginAnnouncements(announcements) {
+    const announcementArea = $('#loginAnnouncementArea');
+    announcementArea.empty();
+
+    if (!announcements || announcements.length === 0) {
+        announcementArea.hide();
+        return;
+    }
+
+    announcements.forEach(announcement => {
+        const typeClass = announcement.type || 'info';
+        const typeName = {
+            'info': '信息',
+            'warning': '警告',
+            'success': '成功',
+            'error': '错误'
+        }[typeClass] || '信息';
+
+        const createdDate = announcement.createdAt
+            ? new Date(announcement.createdAt).toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+            : '';
+
+        const announcementHtml = `
+            <div class="login-announcement-item">
+                <div class="login-announcement-header">
+                    <i class="fa-solid fa-bullhorn login-announcement-icon"></i>
+                    <div class="login-announcement-title">${escapeHtml(announcement.title)}</div>
+                    <span class="login-announcement-type-badge ${typeClass}">${typeName}</span>
+                </div>
+                <div class="login-announcement-content">${escapeHtml(announcement.content)}</div>
+                ${createdDate ? `<div class="login-announcement-time"><i class="fa-solid fa-clock"></i><span>${createdDate}</span></div>` : ''}
+            </div>
+        `;
+        announcementArea.append(announcementHtml);
+    });
+
+    announcementArea.show();
+}
+
+/**
+ * HTML转义，防止XSS
+ * @param {string} text 要转义的文本
+ * @returns {string} 转义后的文本
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }

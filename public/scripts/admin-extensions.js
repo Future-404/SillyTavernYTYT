@@ -1245,13 +1245,31 @@ window.addEventListener('beforeunload', function() {
 
 // 公告管理相关功能
 let currentAnnouncements = [];
+let currentLoginAnnouncements = [];
 
 function bindAnnouncementEvents() {
+    // 公告类型切换按钮
+    const typeTabButtons = document.querySelectorAll('.announcement-type-tab');
+    typeTabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const type = this.dataset.type;
+            switchAnnouncementType(type);
+        });
+    });
+
     // 刷新公告按钮
     const refreshButton = document.getElementById('refreshAnnouncements');
     if (refreshButton) {
         refreshButton.addEventListener('click', function() {
             loadAnnouncements();
+        });
+    }
+
+    // 刷新登录页面公告按钮
+    const refreshLoginButton = document.getElementById('refreshLoginAnnouncements');
+    if (refreshLoginButton) {
+        refreshLoginButton.addEventListener('click', function() {
+            loadLoginAnnouncements();
         });
     }
 
@@ -1266,6 +1284,46 @@ function bindAnnouncementEvents() {
             e.preventDefault();
             createAnnouncement();
         });
+    }
+
+    // 创建登录页面公告表单
+    const createLoginAnnouncementForm = document.querySelector('.createLoginAnnouncementForm');
+    if (createLoginAnnouncementForm) {
+        // 克隆并替换表单以避免重复事件监听器
+        const newLoginForm = createLoginAnnouncementForm.cloneNode(true);
+        createLoginAnnouncementForm.parentNode.replaceChild(newLoginForm, createLoginAnnouncementForm);
+
+        newLoginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            createLoginAnnouncement(e.target);
+        });
+    }
+}
+
+// 切换公告类型
+function switchAnnouncementType(type) {
+    // 更新按钮状态
+    const typeTabButtons = document.querySelectorAll('.announcement-type-tab');
+    typeTabButtons.forEach(button => {
+        if (button.dataset.type === type) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+    });
+
+    // 切换显示的内容
+    const mainSection = document.getElementById('mainAnnouncementSection');
+    const loginSection = document.getElementById('loginAnnouncementSection');
+
+    if (type === 'main') {
+        mainSection.style.display = 'block';
+        loginSection.style.display = 'none';
+        loadAnnouncements();
+    } else if (type === 'login') {
+        mainSection.style.display = 'none';
+        loginSection.style.display = 'block';
+        loadLoginAnnouncements();
     }
 }
 
@@ -1537,6 +1595,301 @@ async function deleteAnnouncement(announcementId) {
         alert('删除公告失败: ' + error.message);
     }
 }
+
+// ========== 登录页面公告管理功能 ==========
+
+// 加载登录页面公告列表
+async function loadLoginAnnouncements() {
+    try {
+        showLoadingState('loginAnnouncementsContainer');
+
+        const response = await fetch('/api/announcements/login', {
+            method: 'GET',
+            headers: getRequestHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load login announcements');
+        }
+
+        currentLoginAnnouncements = await response.json();
+        renderLoginAnnouncements();
+
+    } catch (error) {
+        console.error('Error loading login announcements:', error);
+        showErrorState('loginAnnouncementsContainer', '加载登录页面公告失败');
+    }
+}
+
+// 渲染登录页面公告列表
+function renderLoginAnnouncements() {
+    const container = document.getElementById('loginAnnouncementsContainer');
+    if (!container) return;
+
+    if (currentLoginAnnouncements.length === 0) {
+        container.innerHTML = createEmptyState('fa-bullhorn', '暂无登录页面公告', '还没有创建任何登录页面公告');
+        return;
+    }
+
+    const announcementsHtml = currentLoginAnnouncements.map(announcement => createLoginAnnouncementItem(announcement)).join('');
+    container.innerHTML = announcementsHtml;
+}
+
+// 创建登录页面公告项目
+function createLoginAnnouncementItem(announcement) {
+    const createdAt = new Date(announcement.createdAt).toLocaleString('zh-CN');
+    const updatedAt = announcement.updatedAt ? new Date(announcement.updatedAt).toLocaleString('zh-CN') : createdAt;
+
+    let timeInfo = `创建时间: ${createdAt}`;
+    if (announcement.updatedAt && announcement.updatedAt !== announcement.createdAt) {
+        timeInfo += ` | 更新时间: ${updatedAt}`;
+    }
+
+    const typeMap = {
+        'info': '信息',
+        'warning': '警告',
+        'success': '成功',
+        'error': '错误'
+    };
+    const typeName = typeMap[announcement.type] || '信息';
+
+    return `
+        <div class="announcementItem" data-id="${announcement.id}">
+            <div class="announcementHeader">
+                <div class="announcementTitle">${escapeHtml(announcement.title)}</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="announcementType ${announcement.type || 'info'}">${typeName}</span>
+                    <span class="announcementStatus ${announcement.enabled ? 'enabled' : 'disabled'}">
+                        ${announcement.enabled ? '已启用' : '已禁用'}
+                    </span>
+                </div>
+            </div>
+            <div class="announcementContent">${escapeHtml(announcement.content)}</div>
+            <div class="announcementMeta">
+                <span>${timeInfo}</span>
+                <span>创建者: ${escapeHtml(announcement.createdBy)}</span>
+            </div>
+            <div class="announcementActions">
+                <button type="button" class="menu_button menu_button_icon warning" onclick="toggleLoginAnnouncement('${announcement.id}')">
+                    <i class="fa-fw fa-solid fa-${announcement.enabled ? 'pause' : 'play'}"></i>
+                    <span>${announcement.enabled ? '禁用' : '启用'}</span>
+                </button>
+                <button type="button" class="menu_button menu_button_icon danger" onclick="deleteLoginAnnouncement('${announcement.id}')">
+                    <i class="fa-fw fa-solid fa-trash"></i>
+                    <span>删除</span>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// 创建新的登录页面公告
+async function createLoginAnnouncement(formElement) {
+    const form = formElement || document.querySelector('.createLoginAnnouncementForm');
+    if (!form) {
+        console.error('Login announcement form not found');
+        alert('表单未找到，请刷新页面重试');
+        return;
+    }
+
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (!submitButton) {
+        console.error('Submit button not found');
+        alert('提交按钮未找到，请刷新页面重试');
+        return;
+    }
+
+    // 防止重复提交
+    if (submitButton.disabled) {
+        return;
+    }
+
+    // 等待DOM更新后再查询元素
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // 使用多种方式查询元素
+    let titleInput = form.querySelector('input[name="title"]');
+    let contentInput = form.querySelector('textarea[name="content"]');
+    let typeInput = form.querySelector('select[name="type"]');
+    let enabledInput = form.querySelector('input[name="enabled"]');
+
+    // 如果表单内查询失败，尝试在登录公告区域全局查询
+    if (!titleInput) {
+        titleInput = document.querySelector('#loginAnnouncementSection input[name="title"]');
+    }
+    if (!contentInput) {
+        contentInput = document.querySelector('#loginAnnouncementSection textarea[name="content"]');
+    }
+    if (!typeInput) {
+        typeInput = document.querySelector('#loginAnnouncementSection select[name="type"]');
+    }
+    if (!enabledInput) {
+        enabledInput = document.querySelector('#loginAnnouncementSection input[name="enabled"]');
+    }
+
+    // 如果通过name查询失败，使用索引方式获取
+    let title = '';
+    let content = '';
+    let type = 'info';
+    let enabled = true;
+
+    if (titleInput) {
+        title = titleInput.value.trim();
+    } else {
+        // 通过索引获取第一个text类型的input
+        const textInputs = form.querySelectorAll('input[type="text"]');
+        if (textInputs.length > 0) {
+            title = textInputs[0].value.trim();
+        }
+    }
+
+    if (contentInput) {
+        content = contentInput.value.trim();
+    } else {
+        // 通过索引获取第一个textarea
+        const textareas = form.querySelectorAll('textarea');
+        if (textareas.length > 0) {
+            content = textareas[0].value.trim();
+        }
+    }
+
+    if (typeInput) {
+        type = typeInput.value;
+    } else {
+        // 通过索引获取第一个select
+        const selects = form.querySelectorAll('select');
+        if (selects.length > 0) {
+            type = selects[0].value;
+        }
+    }
+
+    if (enabledInput) {
+        enabled = enabledInput.checked;
+    } else {
+        // 通过索引获取checkbox
+        const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+        if (checkboxes.length > 0) {
+            enabled = checkboxes[0].checked;
+        }
+    }
+
+    const data = {
+        title: title,
+        content: content,
+        type: type,
+        enabled: enabled
+    };
+
+    console.log('Login announcement form data:', data);
+
+    // 验证必填字段
+    if (!data.title || !data.content) {
+        alert('请填写标题和内容');
+        return;
+    }
+
+    submitButton.disabled = true;
+    const originalText = submitButton.innerHTML;
+    submitButton.innerHTML = '<i class="fa-fw fa-solid fa-spinner fa-spin"></i><span>创建中...</span>';
+
+    try {
+        // 确保有CSRF token
+        if (!csrfToken) {
+            await getCsrfToken();
+        }
+
+        const response = await fetch('/api/announcements/login', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create login announcement');
+        }
+
+        const newAnnouncement = await response.json();
+        console.log('Login announcement created:', newAnnouncement);
+
+        // 重置表单
+        form.reset();
+
+        // 重新加载公告列表
+        await loadLoginAnnouncements();
+
+        alert('登录页面公告创建成功！');
+
+    } catch (error) {
+        console.error('Error creating login announcement:', error);
+        alert('创建登录页面公告失败: ' + error.message);
+    } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalText;
+    }
+}
+
+// 切换登录页面公告启用状态
+async function toggleLoginAnnouncement(announcementId) {
+    try {
+        const response = await fetch(`/api/announcements/login/${announcementId}/toggle`, {
+            method: 'POST',
+            headers: getRequestHeaders()
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to toggle login announcement');
+        }
+
+        const updatedAnnouncement = await response.json();
+        console.log('Login announcement toggled:', updatedAnnouncement);
+
+        // 重新加载公告列表
+        await loadLoginAnnouncements();
+
+    } catch (error) {
+        console.error('Error toggling login announcement:', error);
+        alert('切换登录页面公告状态失败: ' + error.message);
+    }
+}
+
+// 删除登录页面公告
+async function deleteLoginAnnouncement(announcementId) {
+    const announcement = currentLoginAnnouncements.find(a => a.id === announcementId);
+    if (!announcement) return;
+
+    if (!confirm(`确定要删除登录页面公告"${announcement.title}"吗？此操作不可恢复。`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/announcements/login/${announcementId}`, {
+            method: 'DELETE',
+            headers: getRequestHeaders()
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete login announcement');
+        }
+
+        console.log('Login announcement deleted:', announcementId);
+
+        // 重新加载公告列表
+        await loadLoginAnnouncements();
+
+        alert('登录页面公告删除成功！');
+
+    } catch (error) {
+        console.error('Error deleting login announcement:', error);
+        alert('删除登录页面公告失败: ' + error.message);
+    }
+}
+
+// 将函数添加到全局作用域，以便HTML的onclick可以调用
+window.toggleLoginAnnouncement = toggleLoginAnnouncement;
+window.deleteLoginAnnouncement = deleteLoginAnnouncement;
 
 // 导出函数供外部调用
 if (typeof window !== 'undefined') {

@@ -385,42 +385,108 @@
         <div class="flex-container flexFlowColumn flexGap10">
             <h3 data-i18n="Announcement Management">公告管理</h3>
 
-            <!-- 创建新公告 -->
-            <div class="createAnnouncementSection">
-                <h4>创建新公告</h4>
-                <form class="flex-container flexFlowColumn flexGap10 createAnnouncementForm" action="javascript:void(0);">
-                    <div class="flex-container flexNoGap">
-                        <span>标题:</span>
-                        <input name="title" class="text_pole" type="text" placeholder="输入公告标题" required>
-                    </div>
-                    <div class="flex-container flexNoGap">
-                        <span>内容:</span>
-                        <textarea name="content" class="text_pole" rows="5" placeholder="输入公告内容" required></textarea>
-                    </div>
-                    <div class="flex-container alignItemsCenter flexGap10">
-                        <label class="flex-container alignItemsCenter flexGap5">
-                            <input name="enabled" type="checkbox" checked>
-                            <span>立即启用</span>
-                        </label>
-                        <button type="submit" class="menu_button menu_button_icon">
-                            <i class="fa-fw fa-solid fa-plus"></i>
-                            <span data-i18n="Create">创建公告</span>
-                        </button>
-                    </div>
-                </form>
+            <!-- 公告类型切换 -->
+            <div class="flex-container justifyCenter flexGap10" style="margin-bottom: 15px;">
+                <button type="button" class="menu_button menu_button_icon announcement-type-tab active" data-type="main">
+                    <i class="fa-fw fa-solid fa-home"></i>
+                    <span>主站公告</span>
+                </button>
+                <button type="button" class="menu_button menu_button_icon announcement-type-tab" data-type="login">
+                    <i class="fa-fw fa-solid fa-sign-in-alt"></i>
+                    <span>登录页面公告</span>
+                </button>
             </div>
 
-            <!-- 公告列表 -->
-            <div class="announcementsList">
-                <h4>现有公告</h4>
-                <div class="flex-container justifyCenter flexGap10" style="margin-bottom: 15px;">
-                    <button type="button" class="menu_button menu_button_icon" id="refreshAnnouncements">
-                        <i class="fa-fw fa-solid fa-refresh"></i>
-                        <span data-i18n="Refresh">刷新列表</span>
-                    </button>
+            <!-- 主站公告管理 -->
+            <div class="announcement-section" id="mainAnnouncementSection">
+                <!-- 创建新公告 -->
+                <div class="createAnnouncementSection">
+                    <h4>创建新公告</h4>
+                    <form class="flex-container flexFlowColumn flexGap10 createAnnouncementForm" action="javascript:void(0);">
+                        <div class="flex-container flexNoGap">
+                            <span>标题:</span>
+                            <input name="title" class="text_pole" type="text" placeholder="输入公告标题" required>
+                        </div>
+                        <div class="flex-container flexNoGap">
+                            <span>内容:</span>
+                            <textarea name="content" class="text_pole" rows="5" placeholder="输入公告内容" required></textarea>
+                        </div>
+                        <div class="flex-container alignItemsCenter flexGap10">
+                            <label class="flex-container alignItemsCenter flexGap5">
+                                <input name="enabled" type="checkbox" checked>
+                                <span>立即启用</span>
+                            </label>
+                            <button type="submit" class="menu_button menu_button_icon">
+                                <i class="fa-fw fa-solid fa-plus"></i>
+                                <span data-i18n="Create">创建公告</span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <div class="announcementsContainer" id="announcementsContainer">
-                    <!-- 公告列表将在这里动态加载 -->
+
+                <!-- 公告列表 -->
+                <div class="announcementsList">
+                    <h4>现有公告</h4>
+                    <div class="flex-container justifyCenter flexGap10" style="margin-bottom: 15px;">
+                        <button type="button" class="menu_button menu_button_icon" id="refreshAnnouncements">
+                            <i class="fa-fw fa-solid fa-refresh"></i>
+                            <span data-i18n="Refresh">刷新列表</span>
+                        </button>
+                    </div>
+                    <div class="announcementsContainer" id="announcementsContainer">
+                        <!-- 公告列表将在这里动态加载 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 登录页面公告管理 -->
+            <div class="announcement-section" id="loginAnnouncementSection" style="display: none;">
+                <!-- 创建新登录页面公告 -->
+                <div class="createAnnouncementSection">
+                    <h4>创建登录页面公告</h4>
+                    <form class="flex-container flexFlowColumn flexGap10 createLoginAnnouncementForm" action="javascript:void(0);">
+                        <div class="flex-container flexNoGap">
+                            <span>标题:</span>
+                            <input name="title" class="text_pole" type="text" placeholder="输入公告标题" required>
+                        </div>
+                        <div class="flex-container flexNoGap">
+                            <span>内容:</span>
+                            <textarea name="content" class="text_pole" rows="5" placeholder="输入公告内容" required></textarea>
+                        </div>
+                        <div class="flex-container alignItemsCenter flexGap10">
+                            <label class="flex-container alignItemsCenter flexGap5">
+                                <span>类型:</span>
+                                <select name="type" class="text_pole" style="width: auto; min-width: 120px;">
+                                    <option value="info">信息</option>
+                                    <option value="warning">警告</option>
+                                    <option value="success">成功</option>
+                                    <option value="error">错误</option>
+                                </select>
+                            </label>
+                            <label class="flex-container alignItemsCenter flexGap5">
+                                <input name="enabled" type="checkbox" checked>
+                                <span>立即启用</span>
+                            </label>
+                            <button type="submit" class="menu_button menu_button_icon">
+                                <i class="fa-fw fa-solid fa-plus"></i>
+                                <span data-i18n="Create">创建公告</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 登录页面公告列表 -->
+                <div class="announcementsList">
+                    <h4>现有登录页面公告</h4>
+                    <div class="flex-container justifyCenter flexGap10" style="margin-bottom: 15px;">
+                        <button type="button" class="menu_button menu_button_icon" id="refreshLoginAnnouncements">
+                            <i class="fa-fw fa-solid fa-refresh"></i>
+                            <span data-i18n="Refresh">刷新列表</span>
+                        </button>
+                    </div>
+                    <div class="announcementsContainer" id="loginAnnouncementsContainer">
+                        <!-- 登录页面公告列表将在这里动态加载 -->
+                    </div>
                 </div>
             </div>
         </div>

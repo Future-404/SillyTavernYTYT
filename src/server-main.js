@@ -293,6 +293,31 @@ app.get('/api/invitation-codes/status', (req, res) => {
     res.json({ enabled });
 });
 
+// Public login page announcements (no auth)
+app.get('/api/announcements/login/current', async (req, res) => {
+    try {
+        const fs = await import('node:fs');
+        const announcementsFilePath = path.join(process.cwd(), 'data', 'announcements', 'login_announcements.json');
+
+        if (!fs.default.existsSync(announcementsFilePath)) {
+            return res.json([]);
+        }
+
+        const data = fs.default.readFileSync(announcementsFilePath, 'utf8');
+        const announcements = JSON.parse(data);
+
+        // 筛选有效的公告
+        const validAnnouncements = announcements.filter(announcement => {
+            return announcement.enabled;
+        });
+
+        res.json(validAnnouncements);
+    } catch (error) {
+        console.error('Error getting current login announcements:', error);
+        res.status(500).json({ error: 'Failed to get current login announcements' });
+    }
+});
+
 // Everything below this line requires authentication
 app.use(requireLoginMiddleware);
 app.post('/api/ping', (request, response) => {
